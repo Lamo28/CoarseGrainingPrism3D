@@ -1,0 +1,7 @@
+name = "CoarseGrainingPrism3D"
+uuid = "319603f0-c756-11e8-1a58-5136ca9f68cb"
+authors = ["Lamo28 <43213026+Lamo28@users.noreply.github.com>"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
