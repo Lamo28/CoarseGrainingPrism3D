@@ -6,7 +6,7 @@ using LinearAlgebra
 #####
 
 ### GLOBAL CONSTANT
-const K = 4
+const K = 2
 const x = K+1
 const y = K/2
 
@@ -234,7 +234,6 @@ function PrB()
 end
 
 ##### coarse-graining algorithm
-"step 1 : SVD for splitting prism into a pyramid and a tetrahedron"
 # create function returning M_{AB}^C, where C fixed spins, A spins of tetra and B spins of pyramid
 export BlocksPrism
 function BlocksPrism(PrismData,jd1::Real,je1::Real,jd2::Real)
@@ -299,7 +298,7 @@ function FullsvdPrismTruncated(PrismData,trunc)
 	FullAindex = Array{Array}(undef,0)
 	FullBindex = Array{Array}(undef,0)
 	FullCindex = Array{Array}(undef,0)
-	s = Array{Array}(undef,0)
+	Fulls = Array{Array}(undef,0)
 	for jd1 in 0:0.5:y, je1 in 0:0.5:y, jd2 in 0:0.5:y
 		if delta(jd1,je1,jd2) == 1
 			temp = svdPrismTruncated(PrismData,jd1,je1,jd2,trunc)
@@ -308,10 +307,10 @@ function FullsvdPrismTruncated(PrismData,trunc)
 			push!(FullAindex,temp[3])
 			push!(FullBindex,temp[4])
 			push!(FullCindex,[jd1,je1,jd2])
-			push!(s,temp[5])
+			push!(Fulls,temp[5])
 		end
 	end
-	return FullU, FullV, FullAindex, FullBindex, FullCindex, s
+	return FullU, FullV, FullAindex, FullBindex, FullCindex, Fulls
 end
 
 export PrismUVTruncated
@@ -366,30 +365,180 @@ function PrismEff(PrismData,trunc)
 			# FullTot = vcat(FullTot,[TempIndex AmpUV[i]*AmpUV[j]])
 			push!(FullAmp,AmpUV[i]*AmpUV[j])
 			push!(BigSIndex,TempIndex)
-			# if TempIndex in BigSIndex
-			# 	posIndex = findall(x->x == TempIndex,BigSIndex)
-			# 	FullAmp[posIndex] += [AmpUV[i]*AmpUV[j]]
-			# else
-			# 	push!(FullAmp,AmpUV[i]*AmpUV[j])
-			# 	push!(BigSIndex,TempIndex)
-			# end
 		end
 	end
 	FullTot = hcat(BigSIndex,FullAmp)
 	p = sortperm(FullTot[:,1])
 	FullTot = FullTot[p,:]
-	NewFullTot = zeros(0,2)
+	NewFullTot = zeros(length(unique(FullTot[:,1])),2)
+	pos = 1
+	cnt = 1
 	for i in 2:size(FullTot,1)
-		cnt = 1
 		if FullTot[i,1] == FullTot[i-1,1]
 			FullTot[i-cnt,2] += FullTot[i,2]
 			cnt += 1
 		else
-			NewFullTot = vcat(NewFullTot,transpose(FullTot[i-cnt,:]))
+			NewFullTot[pos,:] = FullTot[i-cnt,:]
 			cnt = 1
+			pos +=1
 		end
 	end
-	return FullTot[1:3,:]
+	return NewFullTot
 end
+
+export EmbeddingMap1
+function EmbeddingMap1(PrismData,trunc,truncEmbedding1)
+	FullAmp = PrismEff(PrismData,trunc)
+	Amp = FullAmp[:,2]
+	sIndex = FullAmp[:,1]
+
+	#first embedding map, SVD on j1
+	TempLine = Array{Real}(undef,0)
+	TempRest = Array{Real}(undef,0)
+	TempAmp = Array{Real}(undef,0)
+	pos = 1
+	for i in sIndex
+		(β,α1,α2,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
+		push!(TempAmp,Amp[pos])
+		push!(TempLine,j1)
+		push!(TempRest,SuperIndex([β,α1,α2,d,α1t,α2t,α3t,dt,q,j2,u,ut,v,vt,q1,q1t]))
+		pos +=1
+	end
+
+	PosLine = unique(TempLine)
+	PosRest = unique(TempRest)
+	SizeL = length(PosLine)
+	SizeR = length(PosRest)
+	mat = zeros(SizeR,SizeL)
+	for i in 1:length(TempLine)
+        qb = findall(x -> x == TempLine[i], PosLine)
+        qa = findall(x -> x == TempRest[i], PosRest)
+        mat[qa[1],qb[1]] = TempAmp[i]
+    end
+    if SizeL == 0
+        mat = 0
+    end
+
+	U, s, V = svd(mat)
+	V = adjoint(V)
+	sEmb1 = numchop(s)
+	AmpEmb1 = U[:,1:truncEmbedding1]*sqrt.(sEmb1[1:truncEmbedding1])
+	TruncVEmb1 = transpose(sqrt.(sEmb1[1:truncEmbedding1]))*V[1:truncEmbedding1,:]
+
+	# second embedding, on j2,  should be equivalent to the first one. multiplying by the V
+	TempLine = Array{Real}(undef,0)
+	TempRest = Array{Real}(undef,0)
+	TempAmp = Array{Real}(undef,0)
+	pos = 1
+	for i in PosRest
+		(β,α1,α2,d,α1t,α2t,α3t,dt,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,17)
+		push!(TempAmp,Amp[pos])
+		push!(TempLine,j2)
+		push!(TempRest,SuperIndex([β,α1,α2,d,α1t,α2t,α3t,dt,q,u,ut,v,vt,q1,q1t]))
+		pos +=1
+	end
+
+	PosLine = unique(TempLine)
+	PosRest = unique(TempRest)
+	SizeL = length(PosLine)
+	SizeR = length(PosRest)
+	mat = zeros(SizeR,SizeL)
+	for i in 1:length(TempLine)
+		qb = findall(x -> x == TempLine[i], PosLine)
+		qa = findall(x -> x == TempRest[i], PosRest)
+		mat[qa[1],qb[1]] = TempAmp[i]
+	end
+	if SizeL == 0
+		mat = 0
+	end
+
+	U, s, V = svd(mat)
+	V = adjoint(V)
+	sEmb2 = numchop(s)
+	AmpEmb2 = U[:,1:truncEmbedding1]*sqrt.(sEmb2[1:truncEmbedding1])
+	TruncVEmb2 = transpose(sqrt.(sEmb2[1:truncEmbedding1]))*V[1:truncEmbedding1,:]
+
+
+	return AmpEmb2, PosRest, TruncVEmb1,TruncVEmb2, sEmb1,sEmb2
+
+end
+
+export EmbeddingMap1Commutator
+function EmbeddingMap1Commutator(PrismData,trunc,truncEmbedding1)
+	FullAmp = PrismEff(PrismData,trunc)
+	Amp = FullAmp[:,2]
+	sIndex = FullAmp[:,1]
+
+	#first embedding map, SVD on j1
+	TempLine = Array{Real}(undef,0)
+	TempRest = Array{Real}(undef,0)
+	TempAmp = Array{Real}(undef,0)
+	pos = 1
+	for i in sIndex
+		(β,α1,α2,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
+		push!(TempAmp,Amp[pos])
+		push!(TempLine,j2)
+		push!(TempRest,SuperIndex([β,α1,α2,d,α1t,α2t,α3t,dt,j1,q,u,ut,v,vt,q1,q1t]))
+		pos +=1
+	end
+
+	PosLine = unique(TempLine)
+	PosRest = unique(TempRest)
+	SizeL = length(PosLine)
+	SizeR = length(PosRest)
+	mat = zeros(SizeR,SizeL)
+	for i in 1:length(TempLine)
+        qb = findall(x -> x == TempLine[i], PosLine)
+        qa = findall(x -> x == TempRest[i], PosRest)
+        mat[qa[1],qb[1]] = TempAmp[i]
+    end
+    if SizeL == 0
+        mat = 0
+    end
+
+	U, s, V = svd(mat)
+	V = adjoint(V)
+	sEmb1 = numchop(s)
+	AmpEmb1 = U[:,1:truncEmbedding1]*sqrt.(sEmb1[1:truncEmbedding1])
+	TruncVEmb1 = transpose(sqrt.(sEmb1[1:truncEmbedding1]))*V[1:truncEmbedding1,:]
+
+	# second embedding, on j2,  should be equivalent to the first one. multiplying by the V
+	TempLine = Array{Real}(undef,0)
+	TempRest = Array{Real}(undef,0)
+	TempAmp = Array{Real}(undef,0)
+	pos = 1
+	for i in PosRest
+		(β,α1,α2,d,α1t,α2t,α3t,dt,j1,q,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,17)
+		push!(TempAmp,Amp[pos])
+		push!(TempLine,j1)
+		push!(TempRest,SuperIndex([β,α1,α2,d,α1t,α2t,α3t,dt,q,u,ut,v,vt,q1,q1t]))
+		pos +=1
+	end
+
+	PosLine = unique(TempLine)
+	PosRest = unique(TempRest)
+	SizeL = length(PosLine)
+	SizeR = length(PosRest)
+	mat = zeros(SizeR,SizeL)
+	for i in 1:length(TempLine)
+		qb = findall(x -> x == TempLine[i], PosLine)
+		qa = findall(x -> x == TempRest[i], PosRest)
+		mat[qa[1],qb[1]] = TempAmp[i]
+	end
+	if SizeL == 0
+		mat = 0
+	end
+
+	U, s, V = svd(mat)
+	V = adjoint(V)
+	sEmb2 = numchop(s)
+	AmpEmb2 = U[:,1:truncEmbedding1]*sqrt.(sEmb2[1:truncEmbedding1])
+	TruncVEmb2 = transpose(sqrt.(sEmb2[1:truncEmbedding1]))*V[1:truncEmbedding1,:]
+
+
+	return AmpEmb2, PosRest, TruncVEmb1,TruncVEmb2, sEmb1,sEmb2
+
+end
+
 
 end # module
