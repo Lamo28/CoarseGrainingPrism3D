@@ -6,7 +6,7 @@ using LinearAlgebra
 #####
 
 ### GLOBAL CONSTANT
-const K = 2
+const K = 4
 const x = K+1
 const y = K/2
 
@@ -300,6 +300,13 @@ function svdPrismTruncated(PrismData,jd1::Real,je1::Real,jd2::Real,trunc)
 		TruncU = sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncU
 		TruncV = sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncV
 	end
+    if length(Aindex) != 0
+        (ja1,jb1,jg) = Aindex[1]
+        if sign(TruncU[1,1]) != sign(AmpTetraInPrism(jd1,je1,jd2,ja1,jg,jb1))
+             TruncU = -(1)*TruncU
+             TruncV = -(1)*TruncV
+        end
+    end
 
 	return TruncU, TruncV, Aindex, Bindex, s[1:trunc]
 end
@@ -609,7 +616,7 @@ end
 
 #### data from initial tetra in prism
 export AmpTetraInPrism
-function AmpTetraInPrism(j1::Real,j2::Real,j3::Real,j4::Real,j5::Real,j6::Real)
+function AmpTetraInPrism(j4::Real,j5::Real,j6::Real,j1::Real,j2::Real,j3::Real)
 	ans = 0
 	if delta(j4,j5,j6)==1 && delta(j4,j2,j3)==1 && delta(j1,j5,j3)==1 && delta(j1,j2,j6)==1
 		dims = visqrt(j1)*visqrt(j2)*visqrt(j3)*visqrt(j4)*visqrt(j5)*visqrt(j6)
@@ -638,11 +645,11 @@ function FullAmpPyramidInPrism()
 	Index = Array{Real}(undef,0)
 	for j1 in 0:0.5:y, j2 in 0:0.5:y, j3 in 0:0.5:y, j4 in 0:0.5:y, j5 in 0:0.5:y, j6 in 0:0.5:y,
 		a in 0:0.5:y, b in 0:0.5:y, c in 0:0.5:y
-		TempAmp1 = numchop(AmpTetraInPrism(j1,j2,j3,a,b,c))
-		TempAmp2 = numchop(AmpTetraInPrism(j4,j5,j6,a,b,c))
+		TempAmp1 = numchop(AmpTetraInPrism(a,b,c,j1,j2,j3))
+		TempAmp2 = numchop(AmpTetraInPrism(a,b,c,j4,j5,j6))
 		if TempAmp1!=0 && TempAmp2!=0
 			push!(Amp,TempAmp1*TempAmp2/(visqrt(a)*visqrt(b)*visqrt(c)))
-			push!(Index,SuperIndex([j1,j2,j3,j4,j5,j6]))
+			push!(Index,SuperIndex([a,b,c,j1,j2,j3,j4,j5,j6]))
 		end
 	end
 	return Amp,Index

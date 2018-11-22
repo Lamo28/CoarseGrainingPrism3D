@@ -22,21 +22,35 @@ for i in 1:length(dataSVD[2])
         end
     end
 end
-@show length(dataPyramidFromPrism)
+
 
 println("function for AmpTetraInPrism")
 @time dataTetraInPrism = FullAmpTetraInPrism()
 @show length(dataTetraInPrism[1])
 
 println("difference between tetrahedron from prism and teterahedron")
-@show sum(numchop((sort(dataTetraFromPrism) - sort(dataTetraInPrism[1]))).!=0)
+DiffTetra = numchop((sort(dataTetraFromPrism) - sort(dataTetraInPrism[1])))
+@show sum(DiffTetra.!=0)
+for i in 1:length(DiffTetra)
+    if DiffTetra[i] !=0
+        println(sort(dataTetraFromPrism)[i],"\t",sort(dataTetraInPrism[1])[i])
+    end
+end
+
 
 println("function for Amp of pyramid")
 @time dataPyramidInPrism = FullAmpPyramidInPrism()
 @show length(dataPyramidInPrism[1])
+@show length(dataPyramidFromPrism)
 
 println("difference between pyramid from prism and pyramid")
-@show sum(numchop((sort(real(dataPyramidFromPrism)) - sort(real(dataPyramidInPrism[1])))).!=0)
+DiffPyramid = numchop(sort(dataPyramidFromPrism) - sort(dataPyramidInPrism[1]))
+# for i in 1:length(DiffPyramid)
+#     if DiffPyramid[i] != 0
+#         println(sort(dataPyramidFromPrism)[i] ,"\t" ,sort(dataPyramidInPrism[1])[i])
+#     end
+# end
+@show sum(DiffPyramid.!=0)
 
 println("prismUV and its diff with PrA")
 @time dataUV = PrismUVTruncated(data,1)
