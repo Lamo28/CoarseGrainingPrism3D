@@ -42,12 +42,13 @@ end
 #Define delta_{ijkl} -> coupling rules
 export delta
 function delta(i::Real,j::Real,k::Real)
-    sol = 0
-    if i <=(j+k) && j<=(i+k) && k<=(i+j) && i+j+k <= K && 2*(i+j+k)%2 ==0
-        sol = 1
-    end
-    return sol
+	sol = 0
+	if i <= (j+k) && j<= (i+k) && i+j+k <= K &&2*(i+j+k)%2 == 0
+		sol =1
+	end
+	return sol
 end
+
 
 #Define quantum numbers qn (this is real)
 export qn
@@ -119,6 +120,7 @@ function Gsymb(i::Real,j::Real,m::Real,k::Real,l::Real,n::Real)
     return sol
 end
 
+
 ### DATA
 # Define amplitude for a prism function of 12 edges : usual 9 + 3 diag
 export Prism
@@ -132,12 +134,14 @@ function Prism(ja1::Float64,jb1::Float64,jd1::Float64,je1::Float64,jf1::Float64,
     return sol
 end
 
+export SuperIndex
 function SuperIndex(AllSpin)
 	Size = length(AllSpin)
 	ans = Int(2*sum(AllSpin[i]*x^(Size-i) for i in 1:Size)+1)
     return ans
 end
 
+export InverseSuperIndex
 function InverseSuperIndex(y,Size)
     yt = y - 1
     j = zeros(0)
@@ -233,6 +237,7 @@ function PrB()
     return PrA,s
 end
 
+
 ##### coarse-graining algorithm
 # create function returning M_{AB}^C, where C fixed spins, A spins of tetra and B spins of pyramid
 export BlocksPrism
@@ -288,6 +293,14 @@ function svdPrismTruncated(PrismData,jd1::Real,je1::Real,jd2::Real,trunc)
 	TruncU = U[:,1:trunc]*sqrt.(s[1:trunc])
 	TruncV = transpose(sqrt.(s[1:trunc]))*V[1:trunc,:]
 
+	if real(sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))) == 0
+		TruncU = im*sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncU
+		TruncV = -im*sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncV
+	else
+		TruncU = sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncU
+		TruncV = sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncV
+	end
+
 	return TruncU, TruncV, Aindex, Bindex, s[1:trunc]
 end
 
@@ -310,6 +323,12 @@ function FullsvdPrismTruncated(PrismData,trunc)
 			push!(Fulls,temp[5])
 		end
 	end
+
+    if FullU[1][1] != 1
+        FullU = (1/FullU[1][1])*FullU
+        FullV = (1/FullV[1][1])*FullV
+    end
+
 	return FullU, FullV, FullAindex, FullBindex, FullCindex, Fulls
 end
 
@@ -325,14 +344,16 @@ function PrismUVTruncated(PrismData,trunc)
 	for i in 1:SizeC, j in 1:SizeC
 		(dA,bA,aA) = FullCindex[i]
 		(dB,bB,aB) = FullCindex[j]
+		#glue along dA/dB
 		if dA == dB
 			TempA = FullAindex[i]
 			TempB = FullBindex[j]
 			for iA in 1:length(TempA), jB in 1:length(TempB)
 				(j1A,uA,vA) = TempA[iA]
 				(j2B,uB,j3B,j4B,vB,j5B) = TempB[jB]
+				#and glue along uA/uB and vA/vB
 				if uA == uB && vA == vB
-					push!(AmpUV,FullU[i][iA]*FullV[j][jB])
+					push!(AmpUV,FullU[i][iA]*FullV[j][jB]/(visqrt(dA)*visqrt(uA)*visqrt(vB)))
 					push!(PosUV12,SuperIndex([vA,j2B,j5B]))
 					push!(PosUVFace1,SuperIndex([bA,j1A,j4B,j3B,uA]))
 					push!(PosUVFace2,SuperIndex([bA,aA,bB,aB,dA]))
@@ -383,14 +404,17 @@ function PrismEff(PrismData,trunc)
 			pos +=1
 		end
 	end
-	return NewFullTot
+	return NewFullTot[:,1],NewFullTot[:,2]
 end
 
+####
+"embedding map"
+####
+
+#### SVD embedding map, by extracting the edges we don't want to keep
 export EmbeddingMap1
 function EmbeddingMap1(PrismData,trunc,truncEmbedding1)
-	FullAmp = PrismEff(PrismData,trunc)
-	Amp = FullAmp[:,2]
-	sIndex = FullAmp[:,1]
+	sIndex,Amp = PrismEff(PrismData,trunc)
 
 	#first embedding map, SVD on j1
 	TempLine = Array{Real}(undef,0)
@@ -398,10 +422,10 @@ function EmbeddingMap1(PrismData,trunc,truncEmbedding1)
 	TempAmp = Array{Real}(undef,0)
 	pos = 1
 	for i in sIndex
-		(β,α1,α2,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
+		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
 		push!(TempAmp,Amp[pos])
 		push!(TempLine,j1)
-		push!(TempRest,SuperIndex([β,α1,α2,d,α1t,α2t,α3t,dt,q,j2,u,ut,v,vt,q1,q1t]))
+		push!(TempRest,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,q,j2,u,ut,v,vt,q1,q1t]))
 		pos +=1
 	end
 
@@ -431,10 +455,10 @@ function EmbeddingMap1(PrismData,trunc,truncEmbedding1)
 	TempAmp = Array{Real}(undef,0)
 	pos = 1
 	for i in PosRest
-		(β,α1,α2,d,α1t,α2t,α3t,dt,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,17)
+		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,17)
 		push!(TempAmp,Amp[pos])
 		push!(TempLine,j2)
-		push!(TempRest,SuperIndex([β,α1,α2,d,α1t,α2t,α3t,dt,q,u,ut,v,vt,q1,q1t]))
+		push!(TempRest,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,q,u,ut,v,vt,q1,q1t]))
 		pos +=1
 	end
 
@@ -465,9 +489,7 @@ end
 
 export EmbeddingMap1Commutator
 function EmbeddingMap1Commutator(PrismData,trunc,truncEmbedding1)
-	FullAmp = PrismEff(PrismData,trunc)
-	Amp = FullAmp[:,2]
-	sIndex = FullAmp[:,1]
+	sIndex,Amp = PrismEff(PrismData,trunc)
 
 	#first embedding map, SVD on j1
 	TempLine = Array{Real}(undef,0)
@@ -475,10 +497,10 @@ function EmbeddingMap1Commutator(PrismData,trunc,truncEmbedding1)
 	TempAmp = Array{Real}(undef,0)
 	pos = 1
 	for i in sIndex
-		(β,α1,α2,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
+		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
 		push!(TempAmp,Amp[pos])
 		push!(TempLine,j2)
-		push!(TempRest,SuperIndex([β,α1,α2,d,α1t,α2t,α3t,dt,j1,q,u,ut,v,vt,q1,q1t]))
+		push!(TempRest,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,u,ut,v,vt,q1,q1t]))
 		pos +=1
 	end
 
@@ -508,10 +530,10 @@ function EmbeddingMap1Commutator(PrismData,trunc,truncEmbedding1)
 	TempAmp = Array{Real}(undef,0)
 	pos = 1
 	for i in PosRest
-		(β,α1,α2,d,α1t,α2t,α3t,dt,j1,q,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,17)
+		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,17)
 		push!(TempAmp,Amp[pos])
 		push!(TempLine,j1)
-		push!(TempRest,SuperIndex([β,α1,α2,d,α1t,α2t,α3t,dt,q,u,ut,v,vt,q1,q1t]))
+		push!(TempRest,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,q,u,ut,v,vt,q1,q1t]))
 		pos +=1
 	end
 
@@ -539,6 +561,93 @@ function EmbeddingMap1Commutator(PrismData,trunc,truncEmbedding1)
 	return AmpEmb2, PosRest, TruncVEmb1,TruncVEmb2, sEmb1,sEmb2
 
 end
+
+#### Coupling Rule constraint embedding map
+
+function Move2_2diag(PrismData,trunc)
+	sIndex,Amp = PrismEff(PrismData,trunc)
+
+	NewData = Array{Real}(undef,0)
+	NewsIndex = Array{Real}(undef,0)
+	for qMove in 0:0.5:y, i in sIndex
+		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
+		if delta(qMove,q1,ut)==1 && delta(qMove,q1t,v)==1 && delta(qMove,α3,dt)
+			sol = 0
+			for j in 1:length(sIndex)
+				(βa,α1a,α2a,α3a,da,α1ta,α2ta,α3ta,dta,j1a,qa,j2a,ua,uta,va,vta,q1a,q1ta) = InverseSuperIndex(sIndex[j],18)
+				if β==βa && α1a==α1 && α2a==α2 && α3==α3a && da==d && α1ta==α1t && α2ta==α2t && α3ta==α3ta && dta==dt && j1a==j1 && j2a==j2 && ua==u && uta==ut && va==v && vta==vt && q1a==q1 && q1ta==q1t
+					sol += Fsymb(ut,q1t,qa,v,q1,qMove)*Amp[j]
+				end
+			end
+			push!(NewData,sol)
+			push!(NewsIndex,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,qMove,j2,u,ut,v,vt,q1,q1t]))
+		end
+	end
+
+	return NewData,NewsIndex
+end
+
+
+
+function ConstraintEmbedding(PrismData,trunc)
+	data = PrismEff(PrismData,trunc)
+	sIndex = data[1]
+	Amp = data[2]
+	data = nothing
+
+	for i in sIndex
+	end
+	return
+end
+
+
+
+
+##### test function
+
+
+
+#### data from initial tetra in prism
+export AmpTetraInPrism
+function AmpTetraInPrism(j1::Real,j2::Real,j3::Real,j4::Real,j5::Real,j6::Real)
+	ans = 0
+	if delta(j4,j5,j6)==1 && delta(j4,j2,j3)==1 && delta(j1,j5,j3)==1 && delta(j1,j2,j6)==1
+		dims = visqrt(j1)*visqrt(j2)*visqrt(j3)*visqrt(j4)*visqrt(j5)*visqrt(j6)
+		ans = dims*Gsymb(j4,j5,j6,j1,j2,j3)
+	end
+	return ans
+end
+
+export FullAmpTetraInPrism
+function FullAmpTetraInPrism()
+    Amp = Array{Real}(undef,0)
+    Index = Array{Real}(undef,0)
+    for j1 in 0:0.5:y, j2 in 0:0.5:y, j3 in 0:0.5:y, j4 in 0:0.5:y, j5 in 0:0.5:y, j6 in 0:0.5:y
+        TempAmp = numchop(AmpTetraInPrism(j1,j2,j3,j4,j5,j6))
+        if TempAmp!=0
+            push!(Amp,TempAmp)
+            push!(Index,SuperIndex([j1,j2,j3,j4,j5,j6]))
+        end
+    end
+    return Amp,Index
+end
+
+export FullAmpPyramidInPrism
+function FullAmpPyramidInPrism()
+	Amp = Array{Real}(undef,0)
+	Index = Array{Real}(undef,0)
+	for j1 in 0:0.5:y, j2 in 0:0.5:y, j3 in 0:0.5:y, j4 in 0:0.5:y, j5 in 0:0.5:y, j6 in 0:0.5:y,
+		a in 0:0.5:y, b in 0:0.5:y, c in 0:0.5:y
+		TempAmp1 = numchop(AmpTetraInPrism(j1,j2,j3,a,b,c))
+		TempAmp2 = numchop(AmpTetraInPrism(j4,j5,j6,a,b,c))
+		if TempAmp1!=0 && TempAmp2!=0
+			push!(Amp,TempAmp1*TempAmp2/(visqrt(a)*visqrt(b)*visqrt(c)))
+			push!(Index,SuperIndex([j1,j2,j3,j4,j5,j6]))
+		end
+	end
+	return Amp,Index
+end
+
 
 
 end # module
