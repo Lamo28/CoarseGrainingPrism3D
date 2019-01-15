@@ -142,17 +142,6 @@ function Prism(β::Float64,α1::Float64,β1::Float64,α2::Float64,δ::Float64,a1
     return sol
 end
 
-# export Prism
-# function Prism(ja1::Float64,jb1::Float64,jd1::Float64,je1::Float64,jf1::Float64,ja2::Float64,jb2::Float64,
-#                 jd2::Float64,je2::Float64,jf2::Float64,jc::Float64,jg::Float64)
-#     sol = 0
-#     if delta(jd1,jd2,je1) != 0 && delta(jd1,jb1,jg) != 0 && delta(ja1,jd2,jg) != 0 && delta(ja1,jb1,je1) != 0 && delta(jd1,jc,jb2) != 0 && delta(jf1,jd2,jb2) != 0 && delta(jf1,jc,je1) != 0 && delta(jd1,ja2,jf2) != 0 && delta(jc,je2,jf2) != 0 && delta(jb2,je2,ja2) != 0
-#         dims = visqrt(ja1)*visqrt(jb1)*visqrt(jg)*visqrt(jf1)*visqrt(jc)*visqrt(jb2)*visqrt(je2)*visqrt(ja2)*visqrt(jf2)*visqrt(jd1)*visqrt(jd2)*visqrt(je1)
-#         sol =  dims*Gsymb(jd1,jd2,je1,ja1,jb1,jg) * Gsymb(jd1,jd2,je1,jf1,jc,jb2) * Gsymb(jd1,jc,jb2,je2,ja2,jf2)
-#     end
-#     return sol
-# end
-
 export SuperIndex
 function SuperIndex(AllSpin)
 	Size = length(AllSpin)
@@ -370,30 +359,65 @@ function PrismEff(PrismData,trunc)
 			(γt,et,ft) = InverseSuperIndex(PosUVFaceExt[j],3)
 			(Χ,c1t,a2t,c2t,dt) = InverseSuperIndex(PosUVFaceTrue[j],5)
 			#super index for 18 spins prism
-			TempIndex = SuperIndex([χ,α1,a1,α2,β,c1t,a2t,c2t,dt,γ,e,f,γt,et,ft,c1,a2,c2])
+			TempIndex = SuperIndex([χ,α1,a1,α2,β,c1t,a2t,c2t,dt,γ,e,f,γt,et,ft,c1,c2,a2])
 			# FullTot = vcat(FullTot,[TempIndex AmpUV[i]*AmpUV[j]])
 			push!(FullAmp,AmpUV[i]*AmpUV[j])
 			push!(BigSIndex,TempIndex)
 		end
 	end
-	FullTot = hcat(BigSIndex,FullAmp)
-	p = sortperm(FullTot[:,1])
-	FullTot = FullTot[p,:]
-	NewFullTot = zeros(length(unique(FullTot[:,1])),2)
-	pos = 1
-	cnt = 1
-	for i in 2:size(FullTot,1)
-		if FullTot[i,1] == FullTot[i-1,1]
-			FullTot[i-cnt,2] += FullTot[i,2]
-			cnt += 1
-		else
-			NewFullTot[pos,:] = FullTot[i-cnt,:]
-			cnt = 1
-			pos +=1
-		end
-	end
-	return NewFullTot[:,2],NewFullTot[:,1]
+
+    p = sortperm(BigSIndex)
+    BigSIndex = BigSIndex[p]
+    FullAmp = FullAmp[p]
+
+    # NewSindex = zeros(length(unique(BigSIndex)))
+    # NewAmp = zeros(length(unique(BigSIndex)))
+    NewSindex = Array{Int64}(undef,0)
+    NewAmp = Array{Float64}(undef,0)
+    # pos = 1
+    cnt = 1
+    for i in 2:length(BigSIndex)
+        if BigSIndex[i] == BigSIndex[i-1]
+            FullAmp[i-cnt] += FullAmp[i]
+            cnt +=1
+        else
+            # NewAmp[pos] = FullAmp[i-cnt]
+            # NewSindex[pos] = BigSIndex[i-1]
+            push!(NewAmp,FullAmp[i-cnt])
+            push!(NewSindex,BigSIndex[i-1])
+            # pos += 1
+            cnt = 1
+        end
+    end
+    if BigSIndex[end] == BigSIndex[end-1]
+        NewAmp[end] += FullAmp[end]
+    else
+        # NewAmp[end] = FullAmp[end]
+        # NewSindex[end] = BigSIndex[end]
+        push!(NewAmp,FullAmp[end])
+        push!(NewSindex,BigSIndex[end])
+    end
+    return NewAmp, NewSindex
 end
+
+# 	FullTot = hcat(BigSIndex,FullAmp)
+# 	p = sortperm(FullTot[:,1])
+# 	FullTot = FullTot[p,:]
+# 	NewFullTot = zeros(length(unique(FullTot[:,1])),2)
+# 	pos = 1
+# 	cnt = 1
+# 	for i in 2:size(FullTot,1)
+# 		if FullTot[i,1] == FullTot[i-1,1]
+# 			FullTot[i-cnt,2] += FullTot[i,2]
+# 			cnt += 1
+# 		else
+# 			NewFullTot[pos,:] = FullTot[i-cnt,:]
+# 			cnt = 1
+# 			pos +=1
+# 		end
+# 	end
+# 	return NewFullTot[:,2],NewFullTot[:,1]
+# end
 
 ####
 "embedding map"
@@ -414,10 +438,6 @@ function Move2_2(SetAmpAndIndex,SizeSetSpins,PosMove,PosTrianglesOfMove)
 	#				AND j1,h1 / j2,h2 share a vertex
 	Amp,sIndex = SetAmpAndIndex
 
-	# Create New array for final data
-	NewData = Array{Real}(undef,0)
-	NewsIndex = Array{Real}(undef,0)
-
 	TempAmp = Array{Real}(undef,0)
 	TempsIndex = Array{Real}(undef,0)
 	for i in 1:length(sIndex)
@@ -432,18 +452,48 @@ function Move2_2(SetAmpAndIndex,SizeSetSpins,PosMove,PosTrianglesOfMove)
 		end
 	end
 
-	UniqueTempsIndex = unique(TempsIndex)
-	for i in UniqueTempsIndex
-		pos = findall(j-> j == i,TempsIndex)
-		if numchop(sum(TempAmp[pos])) != 0
-			push!(NewData,sum(TempAmp[pos]))
-			push!(NewsIndex,i)
+    # UniqueTempsIndex = unique(TempsIndex)
+    # NewData = Array{Real}(undef,0)
+    # NewsIndex = Array{Int64}(undef,0)
+    # for i in UniqueTempsIndex
+    #  	pos = findall(j-> j == i,TempsIndex)
+    #  	if numchop(sum(TempAmp[pos])) != 0
+    #  		push!(NewData,sum(TempAmp[pos]))
+    #  		push!(NewsIndex,i)
+    #  	end
+    # end
+
+    p = sortperm(TempsIndex)
+    TempsIndex = TempsIndex[p]
+    TempAmp = TempAmp[p]
+	UniquesIndex = unique(TempsIndex)
+
+    NewsIndex = Array{Int64}(undef,0)
+	NewData = Array{Float64}(undef,0)
+
+	cnt = 1
+	for i in 2:length(TempsIndex)
+		if TempsIndex[i] == TempsIndex[i-1]
+			TempAmp[i-cnt] += TempAmp[i]
+			cnt += 1
+		else
+            if numchop(TempAmp[i-cnt]) != 0
+                push!(NewData,TempAmp[i-cnt])
+                push!(NewsIndex,TempsIndex[i-1])
+            end
+			cnt = 1
 		end
 	end
-
+    if TempsIndex[end] == TempsIndex[end-1]
+        NewData[end] += TempAmp[end]
+    else
+        NewData[end] = TempAmp[end]
+        NewsIndex[end] = TempsIndex[end]
+    end
 
 	return NewData,NewsIndex
 end
+
 
 export Move3_1
 function Move3_1(SetAmpAndIndex,SizeSetSpins,PosTrianglesOfMove)
@@ -453,10 +503,6 @@ function Move3_1(SetAmpAndIndex,SizeSetSpins,PosTrianglesOfMove)
     #                   [j1 j2 j3 h1 h2 h3] where ji are disappearing spins, h1 h2 h3 keeping spins
     #                                triangles are: j1j3h1, j1j2h2, j2j3h3
 	Amp,sIndex = SetAmpAndIndex
-
-	# Create New array for final data
-	NewData = Array{Real}(undef,0)
-	NewsIndex = Array{Real}(undef,0)
 
     PositionDelete = Array{Bool}(undef,0)
     for i in 1:SizeSetSpins
@@ -476,26 +522,49 @@ function Move3_1(SetAmpAndIndex,SizeSetSpins,PosTrianglesOfMove)
         if numchop(TempFsymb) != 0
             TempSetSpins = copy(SetSpins)
             push!(TempsIndex,SuperIndex(deleteat!(TempSetSpins,PositionDelete)))
-            push!(TempAmp,(1/TempDimFactor*TempFsymb)*Amp[i])
+            push!(TempAmp,1/(TempDimFactor*TempFsymb)*Amp[i])
         end
     end
 
-    TempAllAmp = Array{Array}(undef,0)
-    UniqueTempsIndex = unique(TempsIndex)
-    for i in UniqueTempsIndex
-        pos = findall(j-> j == i,TempsIndex)
-        push!(TempAllAmp,TempAmp[pos])
-#        if numchop(sum(TempAmp[pos])) != 0
-#            push!(NewData,(1/length(pos))*sum(TempAmp[pos]))
-#            push!(NewsIndex,i)
-#        end
+	# NewData = Array{Real}(undef,0)
+   #  NewsIndex = Array{Real}(undef,0)
+   #  UniqueTempsIndex = unique(TempsIndex)
+   #  for i in UniqueTempsIndex
+   #      pos = findall(j-> j == i,TempsIndex)
+   #      if numchop(sum(TempAmp[pos])) != 0
+   #          push!(NewData,sum(TempAmp[pos]))
+   #          push!(NewsIndex,i)
+   #      end
+   #  end
+   #
+   # if NewData[1] != 1
+   #     NewData = (1/NewData[1])*NewData
+   # end
+
+   p = sortperm(TempsIndex)
+   TempsIndex = TempsIndex[p]
+   TempAmp = TempAmp[p]
+   UniquesIndex = unique(TempsIndex)
+
+   NewsIndex = Array{Int64}(undef,0)
+   NewData = Array{Real}(undef,0)
+
+   pos = 1
+   cnt = 1
+   for i in 2:length(TempsIndex)
+       if TempsIndex[i] == TempsIndex[i-1]
+           TempAmp[i-cnt] += TempAmp[i]
+           cnt += 1
+       else
+           if TempAmp[i-cnt] != 0
+               push!(NewData,TempAmp[i-cnt])
+               push!(NewsIndex,TempsIndex[i])
+           end
+        cnt = 1
+        pos +=1
+        end
     end
-
-#    if NewData[1] != 1
-#        NewData = (1/NewData[1])*NewData
-#    end
-
-	return TempAllAmp
+	return NewData,NewsIndex
 end
 
 
@@ -505,19 +574,19 @@ function EmbPrismEff(PrismData,trunc)
     SetAmpAndIndex = PrismEff(PrismData,trunc)
 
     #Move2_2 for big diagonal
-    Move2_2_BigDiag = Move2_2(SetAmpAndIndex,18,17,[10,11,14,15])
+    Move2_2_BigDiag = Move2_2(SetAmpAndIndex,18,18,[10,11,14,15])
 
     # Move 2_2 first triangle
     Move2_2FirstTriangle = Move2_2(Move2_2_BigDiag,18,16,[2,10,6,13])
 
     # Move3_1 first triangle
-    Move3_1FirstTriangle = Move3_1(Move2_2FirstTriangle,18,[10,13,14,17,16,7])
+    Move3_1FirstTriangle = Move3_1(Move2_2FirstTriangle,18,[10,13,14,18,16,7])
 
     # Move 2_2 second triangle: SHOULD OR NOT ?????
-    Move2_2SecondTriangle = Move2_2(Move3_1FirstTriangle,15,15,[4,11,8,12])
+    Move2_2SecondTriangle = Move2_2(Move3_1FirstTriangle,15,14,[4,11,8,12])
 
     # Move3_1 second triangle: SHOULD OR NOT ?????
-    Move3_1SecondTriangle = Move3_1(Move2_2SecondTriangle,15,[10,11,12,14,3,15])
+    Move3_1SecondTriangle = Move3_1(Move2_2SecondTriangle,15,[10,11,12,15,3,14])
 
     EffPrism = Move3_1SecondTriangle
 
