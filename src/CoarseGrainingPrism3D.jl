@@ -1,12 +1,12 @@
 module CoarseGrainingPrism3D
 #####
 using LinearAlgebra
-
+using Profile
 #####
 #####
 
 ### GLOBAL CONSTANT
-const K = 4
+const K = 2
 const x = K+1
 const y = K/2
 
@@ -19,7 +19,7 @@ function numchop(x::Real)
     end
     return x
 end
-function numchop(x::Complex)
+function numchop(x::ComplexF64)
     ansreal = real(x)
     ansim = imag(x)
     if abs(ansreal) <= 1000*eps()
@@ -123,16 +123,35 @@ end
 
 ### DATA
 # Define amplitude for a prism function of 12 edges : usual 9 + 3 diag
+
 export Prism
-function Prism(ja1::Float64,jb1::Float64,jd1::Float64,je1::Float64,jf1::Float64,ja2::Float64,jb2::Float64,
-                jd2::Float64,je2::Float64,jf2::Float64,jc::Float64,jg::Float64)
+function Prism(β::Float64,α1::Float64,β1::Float64,α2::Float64,δ::Float64,a1::Float64,b::Float64,
+                    a2::Float64,d::Float64,c1::Float64,c2::Float64,f::Float64)
     sol = 0
-    if delta(jd1,jd2,je1) != 0 && delta(jd1,jb1,jg) != 0 && delta(ja1,jd2,jg) != 0 && delta(ja1,jb1,je1) != 0 && delta(jd1,jc,jb2) != 0 && delta(jf1,jd2,jb2) != 0 && delta(jf1,jc,je1) != 0 && delta(jd1,ja2,jf2) != 0 && delta(jc,je2,jf2) != 0 && delta(jb2,je2,ja2) != 0
-        dims = visqrt(ja1)*visqrt(jb1)*visqrt(jg)*visqrt(jf1)*visqrt(jc)*visqrt(jb2)*visqrt(je2)*visqrt(ja2)*visqrt(jf2)*visqrt(jd1)*visqrt(jd2)*visqrt(je1)
-        sol =  dims*Gsymb(jd1,jd2,je1,ja1,jb1,jg) * Gsymb(jd1,jd2,je1,jf1,jc,jb2) * Gsymb(jd1,jc,jb2,je2,ja2,jf2)
+    if delta(c2,d,δ) !=0 && delta(c2,α2,a2) !=0 && delta(β,d,a2) !=0 && delta(β,α2,δ) !=0 &&
+        delta(f,d,α1) !=0 && delta(f,c1,b) !=0 && delta(a1,d,b) !=0 && delta(a1,c1,α1) !=0 &&
+        delta(α1,β1,δ) !=0 && delta(c2,β1,f) !=0
+
+        dims = visqrt(β)*visqrt(α1)*visqrt(β1)*visqrt(α2)*visqrt(δ)*visqrt(a1)*visqrt(b)*visqrt(a2)*visqrt(d)*visqrt(c1)*visqrt(c2)*visqrt(f)
+        sol = dims*Gsymb(c2,d,δ,β,α2,a2)*Gsymb(f,d,α1,a1,c1,b)*Gsymb(c2,d,δ,α1,β1,f)
+
+    if imag(sol) == 0
+        sol = real(sol)
+    end
     end
     return sol
 end
+
+# export Prism
+# function Prism(ja1::Float64,jb1::Float64,jd1::Float64,je1::Float64,jf1::Float64,ja2::Float64,jb2::Float64,
+#                 jd2::Float64,je2::Float64,jf2::Float64,jc::Float64,jg::Float64)
+#     sol = 0
+#     if delta(jd1,jd2,je1) != 0 && delta(jd1,jb1,jg) != 0 && delta(ja1,jd2,jg) != 0 && delta(ja1,jb1,je1) != 0 && delta(jd1,jc,jb2) != 0 && delta(jf1,jd2,jb2) != 0 && delta(jf1,jc,je1) != 0 && delta(jd1,ja2,jf2) != 0 && delta(jc,je2,jf2) != 0 && delta(jb2,je2,ja2) != 0
+#         dims = visqrt(ja1)*visqrt(jb1)*visqrt(jg)*visqrt(jf1)*visqrt(jc)*visqrt(jb2)*visqrt(je2)*visqrt(ja2)*visqrt(jf2)*visqrt(jd1)*visqrt(jd2)*visqrt(je1)
+#         sol =  dims*Gsymb(jd1,jd2,je1,ja1,jb1,jg) * Gsymb(jd1,jd2,je1,jf1,jc,jb2) * Gsymb(jd1,jc,jb2,je2,ja2,jf2)
+#     end
+#     return sol
+# end
 
 export SuperIndex
 function SuperIndex(AllSpin)
@@ -152,96 +171,56 @@ function InverseSuperIndex(y,Size)
     end
     return j
 end
-#actual data of the non zero amplitude for Prism store as two vectors: amp value and their positions
-export PrA
-function PrA()
-    PrA = zeros(0)
-    s = zeros(0)
-    for ja1 in 0.:0.5:y, jb1 in 0.:0.5:y, jd1 in 0.:0.5:y, je1 in 0.:0.5:y, jf1 in 0.:0.5:y, ja2 in 0.:0.5:y,
-                jb2 in 0.:0.5:y, jd2 in 0.:0.5:y, je2 in 0.:0.5:y, jf2 in 0.:0.5:y, jc in 0.:0.5:y, jg in 0.:0.5:y
-        ans = numchop( Prism(ja1,jb1,jd1,je1,jf1,ja2,jb2,jd2,je2,jf2,jc,jg))
-        if ans != 0
-            push!(PrA,ans)
-            push!(s,SuperIndex([ja1,jb1,jd1,je1,jf1,ja2,jb2,jd2,je2,jf2,jc,jg]))
-        end
-    end
-    return PrA,s
-end
 
 export PrAOpti
 function PrAOpti()
-	PrA = zeros(0)
-	s = zeros(0)
+    PrA = Array{Float64}(undef,0)
+	s = Array{Int64}(undef,0)
 
 	sol = 0
 	dims = 0
-	for jd1 in 0:0.5:y, jd2 in 0:0.5:y, je1  in 0:0.5:y
-		if delta(jd1,jd2,je1) != 0
-			for jb1 in 0:0.5:y, jg in 0:0.5:y
-				if delta(jd1,jb1,jg) != 0
-					for ja1 in 0:0.5:y
-						if delta(ja1,jd2,jg) != 0 && delta(ja1,jb1,je1) != 0
-							for jc in 0:0.5:y, jb2 in 0:0.5:y
-								if delta(jd1,jc,jb2) != 0
-									for jf1 in 0:0.5:y
-										if delta(jf1,jd2,jb2) != 0  && delta(jf1,jc,je1) != 0
-											for ja2 in 0:0.5:y, jf2 in 0:0.5:y
-												if delta(jd1,ja2,jf2) != 0
-													for je2 in 0:0.5:y
-														if delta(jc,je2,jf2) != 0 && delta(jb2,je2,ja2) != 0
-															dims = visqrt(ja1)*visqrt(jb1)*visqrt(jg)*visqrt(jf1)*visqrt(jc)*visqrt(jb2)*visqrt(je2)*visqrt(ja2)*visqrt(jf2)*visqrt(jd1)*visqrt(jd2)*visqrt(je1)
-													        sol =  numchop(dims*Gsymb(jd1,jd2,je1,ja1,jb1,jg) * Gsymb(jd1,jd2,je1,jf1,jc,jb2) * Gsymb(jd1,jc,jb2,je2,ja2,jf2))
-															if sol !=0
-																push!(PrA,sol)
-												            	push!(s,SuperIndex([ja1,jb1,jd1,je1,jf1,ja2,jb2,jd2,je2,jf2,jc,jg]))
-															end
-														end
-													end
-												end
-											end
-										end
-									end
-								end
-							end
-						end
-					end
-				end
-			end
-		end
-	end
-	return PrA, s
-end
-
-
-#OUTDATED prismB : Prism with modified diag
-function prismB(ja1::Float64,jb1::Float64,jd1p::Float64,je1::Float64,jf1::Float64,ja2::Float64,jb2::Float64,
-		                 jd2p::Float64,je2::Float64,jf2::Float64,jc::Float64,jg::Float64)
-    sol = 0
-    for jd1 in 0.:0.5:y, jd2 in 0.:0.5:y
-        sol += numchop(Fsymb(ja1,jg,jd2,jb2,jf1,jd2p)*Fsymb(jb1,jg,jd1,ja2,jf2,jd1p)*prismA(ja1,jb1,jd1,je1,jf1,ja2,jb2,jd2,je2,jf2,jc,jg))
-    end
-    return sol
-end
-export PrB
-function PrB()
-    PrA = zeros(0)
-    s = zeros(0)
-    for ja1 in 0.:0.5:y, jb1 in 0.:0.5:y, jd1 in 0.:0.5:y, je1 in 0.:0.5:y, jf1 in 0.:0.5:y, ja2 in 0.:0.5:y,
-                jb2 in 0.:0.5:y, jd2 in 0.:0.5:y, je2 in 0.:0.5:y, jf2 in 0.:0.5:y, jc in 0.:0.5:y, jg in 0.:0.5:y
-        ans = numchop( prismB(ja1,jb1,jd1,je1,jf1,ja2,jb2,jd2,je2,jf2,jc,jg))
-        if ans != 0
-            push!(PrA,ans)
-            push!(s,SuperIndex([ja1,jb1,jd1,je1,jf1,ja2,jb2,jd2,je2,jf2,jc,jg]))
+    for β in 0.:0.5:y, d in 0.:0.5:y, a2 in 0.:0.5:y
+        if delta(β,d,a2) !=0
+            for α2 in 0.:0.5:y, δ in 0.:0.5:y
+                if  delta(β,α2,δ) !=0
+                    for c2 in 0.:0.5:y
+                        if delta(c2,d,δ) !=0 && delta(c2,α2,a2) !=0
+                            for f in 0.:0.5:y, β1 in 0.:0.5:y
+                                if delta(c2,β1,f) !=0
+                                    for α1 in 0.:0.5:y
+                                        if delta(f,d,α1) !=0 && delta(α1,β1,δ) !=0
+                                            for c1 in 0.:0.5:y, a1 in 0.:0.5:y
+                                                if delta(a1,c1,α1) !=0
+                                                    for b in 0.:0.5:y
+                                                        if delta(f,c1,b) !=0 && delta(a1,d,b) !=0
+                                                            dims = visqrt(β)*visqrt(α1)*visqrt(β1)*visqrt(α2)*visqrt(δ)*visqrt(a1)*visqrt(b)*visqrt(a2)*visqrt(d)*visqrt(c1)*visqrt(c2)*visqrt(f)
+                                                            sol = numchop(dims*Gsymb(c2,d,δ,β,α2,a2)*Gsymb(f,d,α1,a1,c1,b)*Gsymb(c2,d,δ,α1,β1,f))
+                                                            if sol !=0
+                                                                push!(PrA,sol)
+                                                                push!(s,SuperIndex([β,α1,β1,α2,δ,a1,b,a2,d,c1,c2,f]))
+                                                            end
+                                                        end
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
-    return PrA,s
+	return PrA, s
 end
 
 
 ##### coarse-graining algorithm
 # create function returning M_{AB}^C, where C fixed spins, A spins of tetra and B spins of pyramid
 export BlocksPrism
-function BlocksPrism(PrismData,jd1::Real,je1::Real,jd2::Real)
+function BlocksPrism(PrismData,c2::Float64,d::Float64,δ::Float64)
     PrA = PrismData[1]
     sIndex = PrismData[2]
 
@@ -250,11 +229,11 @@ function BlocksPrism(PrismData,jd1::Real,je1::Real,jd2::Real)
     TempAmp = Array{Real}(undef,0)
     PosAmp = 1
     for i in sIndex
-        (ja1,jb1,jd1t,je1t,jf1,ja2,jb2,jd2t,je2,jf2,jc,jg) = InverseSuperIndex(i,12)
-        if jd1t == jd1 && je1t == je1 && jd2t == jd2
+        (β,α1,β1,α2,δCut,a1,b,a2,dCut,c1,c2Cut,f) = InverseSuperIndex(i,12)
+        if δCut == δ && dCut == d && c2Cut == c2
             push!(TempAmp,PrA[PosAmp])
-            push!(TempTetra,[ja1 jb1 jg])
-            push!(TempPyra,[jf1 ja2 jb2 je2 jf2 jc])
+            push!(TempTetra,[β α2 a2])
+            push!(TempPyra,[c1 a1 α1 β1 b f])
         end
         PosAmp += 1
     end
@@ -276,57 +255,57 @@ function BlocksPrism(PrismData,jd1::Real,je1::Real,jd2::Real)
 end
 
 export svdPrism
-function svdPrism(PrismData,jd1::Real,je1::Real,jd2::Real)# parameters d1,d2,e1
-    mat, Aindex, Bindex = BlocksPrism(PrismData,jd1,je1,jd2)
+function svdPrism(PrismData,c2::Float64,d::Float64,δ::Float64)# parameters c2,d,δ
+    mat, TetraIndex, PyraIndex = BlocksPrism(PrismData,c2,d,δ)
 
     U, s, V = svd(mat)
     V = adjoint(V)
 
-    return U, numchop(s), V, Aindex, Bindex
+    return U, numchop(s), V, TetraIndex, PyraIndex
 end
 
 #HYP : only take the firsts TRUNC singular values
 export svdPrismTruncated
-function svdPrismTruncated(PrismData,jd1::Real,je1::Real,jd2::Real,trunc)
-	U, s, V, Aindex, Bindex = svdPrism(PrismData,jd1::Real,je1::Real,jd2::Real)
+function svdPrismTruncated(PrismData,c2::Float64,d::Float64,δ::Float64,trunc)
+	U, s, V, TetraIndex, PyraIndex = svdPrism(PrismData,c2,d,δ)
 
 	TruncU = U[:,1:trunc]*sqrt.(s[1:trunc])
 	TruncV = transpose(sqrt.(s[1:trunc]))*V[1:trunc,:]
 
-	if real(sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))) == 0
-		TruncU = im*sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncU
-		TruncV = -im*sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncV
+	if real(sqrt(visqrt(c2)*visqrt(d)*visqrt(δ))) == 0
+		TruncU = im*sqrt(visqrt(c2)*visqrt(d)*visqrt(δ))*TruncU
+		TruncV = -im*sqrt(visqrt(c2)*visqrt(d)*visqrt(δ))*TruncV
 	else
-		TruncU = sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncU
-		TruncV = sqrt(visqrt(jd1)*visqrt(je1)*visqrt(jd2))*TruncV
+		TruncU = sqrt(visqrt(c2)*visqrt(d)*visqrt(δ))*TruncU
+		TruncV = sqrt(visqrt(c2)*visqrt(d)*visqrt(δ))*TruncV
 	end
-    if length(Aindex) != 0
-        (ja1,jb1,jg) = Aindex[1]
-        if sign(TruncU[1,1]) != sign(AmpTetraInPrism(jd1,je1,jd2,ja1,jg,jb1))
+    if length(TetraIndex) != 0
+        (β,α2,a2) = TetraIndex[1]
+        if sign(TruncU[1,1]) != sign(AmpTetraInPrism(c2,d,δ,β,α2,a2))
              TruncU = -(1)*TruncU
              TruncV = -(1)*TruncV
         end
     end
 
-	return TruncU, TruncV, Aindex, Bindex, s[1:trunc]
+	return real(TruncU), real(TruncV), TetraIndex, PyraIndex, s[1:trunc]
 end
 
 export FullsvdPrismTruncated
 function FullsvdPrismTruncated(PrismData,trunc)
 	FullU = Array{Array}(undef,0)
 	FullV = Array{Array}(undef,0)
-	FullAindex = Array{Array}(undef,0)
-	FullBindex = Array{Array}(undef,0)
-	FullCindex = Array{Array}(undef,0)
+	FullTetraindex = Array{Array}(undef,0)
+	FullPyraindex = Array{Array}(undef,0)
+	FullCutindex = Array{Array}(undef,0)
 	Fulls = Array{Array}(undef,0)
-	for jd1 in 0:0.5:y, je1 in 0:0.5:y, jd2 in 0:0.5:y
-		if delta(jd1,je1,jd2) == 1
-			temp = svdPrismTruncated(PrismData,jd1,je1,jd2,trunc)
+	for c2 in 0:0.5:y, d in 0:0.5:y, δ in 0:0.5:y
+		if delta(c2,d,δ) == 1
+			temp = svdPrismTruncated(PrismData,c2,d,δ,trunc)
 			push!(FullU,temp[1])
 			push!(FullV,temp[2])
-			push!(FullAindex,temp[3])
-			push!(FullBindex,temp[4])
-			push!(FullCindex,[jd1,je1,jd2])
+			push!(FullTetraindex,temp[3])
+			push!(FullPyraindex,temp[4])
+			push!(FullCutindex,[c2,d,δ])
 			push!(Fulls,temp[5])
 		end
 	end
@@ -336,60 +315,62 @@ function FullsvdPrismTruncated(PrismData,trunc)
         FullV = (1/FullV[1][1])*FullV
     end
 
-	return FullU, FullV, FullAindex, FullBindex, FullCindex, Fulls
+	return FullU, FullV, FullTetraindex, FullPyraindex, FullCutindex, Fulls
 end
 
 export PrismUVTruncated
 function PrismUVTruncated(PrismData,trunc)
-	FullU, FullV, FullAindex, FullBindex, FullCindex,s = FullsvdPrismTruncated(PrismData,trunc)
+	FullU, FullV, FullTetraindex, FullPyraindex, FullCutindex,s = FullsvdPrismTruncated(PrismData,trunc)
 
-	AmpUV = Array{Real}(undef,0)
-	PosUV12 = Array{Real}(undef,0)
-	PosUVFace1 = Array{Real}(undef,0)
-	PosUVFace2 = Array{Real}(undef,0)
-	SizeC = length(FullCindex)
+	AmpUV = Array{Float64}(undef,0)
+	PosUVFaceExt = Array{Int64}(undef,0)
+	PosUVFaceTrue = Array{Int64}(undef,0)
+	PosUVFaceFalse = Array{Int64}(undef,0)
+	SizeC = length(FullCutindex)
 	for i in 1:SizeC, j in 1:SizeC
-		(dA,bA,aA) = FullCindex[i]
-		(dB,bB,aB) = FullCindex[j]
+		(c2,d,δ) = FullCutindex[i]
+		(c2t,dt,δt) = FullCutindex[j]
 		#glue along dA/dB
-		if dA == dB
-			TempA = FullAindex[i]
-			TempB = FullBindex[j]
-			for iA in 1:length(TempA), jB in 1:length(TempB)
-				(j1A,uA,vA) = TempA[iA]
-				(j2B,uB,j3B,j4B,vB,j5B) = TempB[jB]
+		if d == dt
+			TempTetra = FullTetraindex[i]
+			TempPyra = FullPyraindex[j]
+			for iA in 1:length(TempTetra), jB in 1:length(TempPyra)
+				(β,α2,a2) = TempTetra[iA]
+				(c1t,a1t,α1t,β1t,bt,ft) = TempPyra[jB]
 				#and glue along uA/uB and vA/vB
-				if uA == uB && vA == vB
-					push!(AmpUV,FullU[i][iA]*FullV[j][jB]/(visqrt(dA)*visqrt(uA)*visqrt(vB)))
-					push!(PosUV12,SuperIndex([vA,j2B,j5B]))
-					push!(PosUVFace1,SuperIndex([bA,j1A,j4B,j3B,uA]))
-					push!(PosUVFace2,SuperIndex([bA,aA,bB,aB,dA]))
+				if β == bt && a2 == a1t
+					push!(AmpUV,FullU[i][iA]*FullV[j][jB]/(visqrt(d)*visqrt(β)*visqrt(a2)))
+					push!(PosUVFaceExt,SuperIndex([β1t,ft,β]))
+					push!(PosUVFaceTrue,SuperIndex([c2,δt,c2t,δ,d]))
+					push!(PosUVFaceFalse,SuperIndex([c2,α1t,c1t,α2,a2]))
 				end
 			end
 		end
 	end
-	return AmpUV,PosUV12,PosUVFace1,PosUVFace2, s
+	return AmpUV,PosUVFaceExt,PosUVFaceTrue,PosUVFaceFalse, s
 end
+
 
 export PrismEff
 function PrismEff(PrismData,trunc)
-	AmpUV,PosUV12,PosUVFace1,PosUVFace2,s = PrismUVTruncated(PrismData,trunc)
+
+	AmpUV,PosUVFaceExt,PosUVFaceTrue,PosUVFaceFalse, s = PrismUVTruncated(PrismData,trunc)
 	FullAmp = Array{Real}(undef,0)
 	BigSIndex = Array{Real}(undef,0)
-	for i in 1:length(PosUVFace1)
+	for i in 1:length(PosUVFaceTrue)
 		# spins of first prism
-		(bA,j1A,j4B,j3B,uA) = InverseSuperIndex(PosUVFace1[i],5) #shared spins
-		(vA,j2B,j5B) = InverseSuperIndex(PosUV12[i],3)
-		(bA,aA,bB,aB,dA) = InverseSuperIndex(PosUVFace2[i],5)
+		(Χ,c1,a2,c2,d) = InverseSuperIndex(PosUVFaceTrue[i],5) #shared spins
+		(γ,e,f) = InverseSuperIndex(PosUVFaceExt[i],3)
+		(χ,α1,a1,α2,β) = InverseSuperIndex(PosUVFaceFalse[i],5) # was face 2
 
-		pos = findall(x->x == PosUVFace1[i],PosUVFace2)
+		pos = findall(x->x == PosUVFaceTrue[i],PosUVFaceFalse)
 		for j in pos
 			# spins of second prism
 			#(bA,j1A,j4B,j3B,uA)
-			(vAt,j2Bt,j5Bt) = InverseSuperIndex(PosUV12[j],3)
-			(bA,j1At,j4Bt,j3Bt,uAt) = InverseSuperIndex(PosUVFace1[j],5)
+			(γt,et,ft) = InverseSuperIndex(PosUVFaceExt[j],3)
+			(Χ,c1t,a2t,c2t,dt) = InverseSuperIndex(PosUVFaceTrue[j],5)
 			#super index for 18 spins prism
-			TempIndex = SuperIndex([bA,aA,bB,aB,dA,j1At,j4Bt,j3Bt,uAt,j1A,j4B,j3B,vA,vAt,j2B,j2Bt,j5B,j5Bt])
+			TempIndex = SuperIndex([χ,α1,a1,α2,β,c1t,a2t,c2t,dt,γ,e,f,γt,et,ft,c1,a2,c2])
 			# FullTot = vcat(FullTot,[TempIndex AmpUV[i]*AmpUV[j]])
 			push!(FullAmp,AmpUV[i]*AmpUV[j])
 			push!(BigSIndex,TempIndex)
@@ -411,203 +392,137 @@ function PrismEff(PrismData,trunc)
 			pos +=1
 		end
 	end
-	return NewFullTot[:,1],NewFullTot[:,2]
+	return NewFullTot[:,2],NewFullTot[:,1]
 end
 
 ####
 "embedding map"
 ####
 
-#### SVD embedding map, by extracting the edges we don't want to keep
-export EmbeddingMap1
-function EmbeddingMap1(PrismData,trunc,truncEmbedding1)
-	sIndex,Amp = PrismEff(PrismData,trunc)
+# 2-2 move for diag
+# WARNING: Move done with Fsym, wich need to be either redefine at every step ? or always keep
+# initial one ? but then we know something weird might happen -> do test !! IN THE FOLLOWING
+# DONE WITH INITIAL Fsymb
 
-	#first embedding map, SVD on j1
-	TempLine = Array{Real}(undef,0)
-	TempRest = Array{Real}(undef,0)
-	TempAmp = Array{Real}(undef,0)
-	pos = 1
-	for i in sIndex
-		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
-		push!(TempAmp,Amp[pos])
-		push!(TempLine,j1)
-		push!(TempRest,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,q,j2,u,ut,v,vt,q1,q1t]))
-		pos +=1
-	end
+export Move2_2
+function Move2_2(SetAmpAndIndex,SizeSetSpins,PosMove,PosTrianglesOfMove)
+	# SetIndexAndAmp: full set of amplitude and SuperIndex pos of non zero
+	# SizeSetSpins: number of edges in polyhedra associated to SetIndexAndAmp
+	# PosMove: Position of the edge/spin that we want to flip
+	# PosTrianglesOfMove: Positions of the OTHER 4 edges, forming with PosMove the two ini triangles
+	# 				that is PosTrianglesOfMove = [j1,j2 , h1,h2] and j1j2Posmove / h1h2Posmove ini triangles
+	#				AND j1,h1 / j2,h2 share a vertex
+	Amp,sIndex = SetAmpAndIndex
 
-	PosLine = unique(TempLine)
-	PosRest = unique(TempRest)
-	SizeL = length(PosLine)
-	SizeR = length(PosRest)
-	mat = zeros(SizeR,SizeL)
-	for i in 1:length(TempLine)
-        qb = findall(x -> x == TempLine[i], PosLine)
-        qa = findall(x -> x == TempRest[i], PosRest)
-        mat[qa[1],qb[1]] = TempAmp[i]
-    end
-    if SizeL == 0
-        mat = 0
-    end
-
-	U, s, V = svd(mat)
-	V = adjoint(V)
-	sEmb1 = numchop(s)
-	AmpEmb1 = U[:,1:truncEmbedding1]*sqrt.(sEmb1[1:truncEmbedding1])
-	TruncVEmb1 = transpose(sqrt.(sEmb1[1:truncEmbedding1]))*V[1:truncEmbedding1,:]
-
-	# second embedding, on j2,  should be equivalent to the first one. multiplying by the V
-	TempLine = Array{Real}(undef,0)
-	TempRest = Array{Real}(undef,0)
-	TempAmp = Array{Real}(undef,0)
-	pos = 1
-	for i in PosRest
-		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,17)
-		push!(TempAmp,Amp[pos])
-		push!(TempLine,j2)
-		push!(TempRest,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,q,u,ut,v,vt,q1,q1t]))
-		pos +=1
-	end
-
-	PosLine = unique(TempLine)
-	PosRest = unique(TempRest)
-	SizeL = length(PosLine)
-	SizeR = length(PosRest)
-	mat = zeros(SizeR,SizeL)
-	for i in 1:length(TempLine)
-		qb = findall(x -> x == TempLine[i], PosLine)
-		qa = findall(x -> x == TempRest[i], PosRest)
-		mat[qa[1],qb[1]] = TempAmp[i]
-	end
-	if SizeL == 0
-		mat = 0
-	end
-
-	U, s, V = svd(mat)
-	V = adjoint(V)
-	sEmb2 = numchop(s)
-	AmpEmb2 = U[:,1:truncEmbedding1]*sqrt.(sEmb2[1:truncEmbedding1])
-	TruncVEmb2 = transpose(sqrt.(sEmb2[1:truncEmbedding1]))*V[1:truncEmbedding1,:]
-
-
-	return AmpEmb2, PosRest, TruncVEmb1,TruncVEmb2, sEmb1,sEmb2
-
-end
-
-export EmbeddingMap1Commutator
-function EmbeddingMap1Commutator(PrismData,trunc,truncEmbedding1)
-	sIndex,Amp = PrismEff(PrismData,trunc)
-
-	#first embedding map, SVD on j1
-	TempLine = Array{Real}(undef,0)
-	TempRest = Array{Real}(undef,0)
-	TempAmp = Array{Real}(undef,0)
-	pos = 1
-	for i in sIndex
-		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
-		push!(TempAmp,Amp[pos])
-		push!(TempLine,j2)
-		push!(TempRest,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,u,ut,v,vt,q1,q1t]))
-		pos +=1
-	end
-
-	PosLine = unique(TempLine)
-	PosRest = unique(TempRest)
-	SizeL = length(PosLine)
-	SizeR = length(PosRest)
-	mat = zeros(SizeR,SizeL)
-	for i in 1:length(TempLine)
-        qb = findall(x -> x == TempLine[i], PosLine)
-        qa = findall(x -> x == TempRest[i], PosRest)
-        mat[qa[1],qb[1]] = TempAmp[i]
-    end
-    if SizeL == 0
-        mat = 0
-    end
-
-	U, s, V = svd(mat)
-	V = adjoint(V)
-	sEmb1 = numchop(s)
-	AmpEmb1 = U[:,1:truncEmbedding1]*sqrt.(sEmb1[1:truncEmbedding1])
-	TruncVEmb1 = transpose(sqrt.(sEmb1[1:truncEmbedding1]))*V[1:truncEmbedding1,:]
-
-	# second embedding, on j2,  should be equivalent to the first one. multiplying by the V
-	TempLine = Array{Real}(undef,0)
-	TempRest = Array{Real}(undef,0)
-	TempAmp = Array{Real}(undef,0)
-	pos = 1
-	for i in PosRest
-		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,17)
-		push!(TempAmp,Amp[pos])
-		push!(TempLine,j1)
-		push!(TempRest,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,q,u,ut,v,vt,q1,q1t]))
-		pos +=1
-	end
-
-	PosLine = unique(TempLine)
-	PosRest = unique(TempRest)
-	SizeL = length(PosLine)
-	SizeR = length(PosRest)
-	mat = zeros(SizeR,SizeL)
-	for i in 1:length(TempLine)
-		qb = findall(x -> x == TempLine[i], PosLine)
-		qa = findall(x -> x == TempRest[i], PosRest)
-		mat[qa[1],qb[1]] = TempAmp[i]
-	end
-	if SizeL == 0
-		mat = 0
-	end
-
-	U, s, V = svd(mat)
-	V = adjoint(V)
-	sEmb2 = numchop(s)
-	AmpEmb2 = U[:,1:truncEmbedding1]*sqrt.(sEmb2[1:truncEmbedding1])
-	TruncVEmb2 = transpose(sqrt.(sEmb2[1:truncEmbedding1]))*V[1:truncEmbedding1,:]
-
-
-	return AmpEmb2, PosRest, TruncVEmb1,TruncVEmb2, sEmb1,sEmb2
-
-end
-
-#### Coupling Rule constraint embedding map
-
-function Move2_2diag(PrismData,trunc)
-	sIndex,Amp = PrismEff(PrismData,trunc)
-
+	# Create New array for final data
 	NewData = Array{Real}(undef,0)
 	NewsIndex = Array{Real}(undef,0)
-	for qMove in 0:0.5:y, i in sIndex
-		(β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,q,j2,u,ut,v,vt,q1,q1t) = InverseSuperIndex(i,18)
-		if delta(qMove,q1,ut)==1 && delta(qMove,q1t,v)==1 && delta(qMove,α3,dt)
-			sol = 0
-			for j in 1:length(sIndex)
-				(βa,α1a,α2a,α3a,da,α1ta,α2ta,α3ta,dta,j1a,qa,j2a,ua,uta,va,vta,q1a,q1ta) = InverseSuperIndex(sIndex[j],18)
-				if β==βa && α1a==α1 && α2a==α2 && α3==α3a && da==d && α1ta==α1t && α2ta==α2t && α3ta==α3ta && dta==dt && j1a==j1 && j2a==j2 && ua==u && uta==ut && va==v && vta==vt && q1a==q1 && q1ta==q1t
-					sol += Fsymb(ut,q1t,qa,v,q1,qMove)*Amp[j]
-				end
+
+	TempAmp = Array{Real}(undef,0)
+	TempsIndex = Array{Real}(undef,0)
+	for i in 1:length(sIndex)
+		SetSpins = InverseSuperIndex(sIndex[i],SizeSetSpins)
+		for qMove in 0:0.5:y
+            TempFsymb = Fsymb(SetSpins[PosTrianglesOfMove[1]],SetSpins[PosTrianglesOfMove[2]],SetSpins[PosMove],SetSpins[PosTrianglesOfMove[4]],SetSpins[PosTrianglesOfMove[3]],qMove)
+            if numchop(TempFsymb) != 0
+                TempSetSpins = copy(SetSpins)
+				push!(TempsIndex,SuperIndex(insert!(deleteat!(TempSetSpins,PosMove),PosMove,qMove)))
+				push!(TempAmp,TempFsymb*Amp[i])
 			end
-			push!(NewData,sol)
-			push!(NewsIndex,SuperIndex([β,α1,α2,α3,d,α1t,α2t,α3t,dt,j1,qMove,j2,u,ut,v,vt,q1,q1t]))
 		end
 	end
+
+	UniqueTempsIndex = unique(TempsIndex)
+	for i in UniqueTempsIndex
+		pos = findall(j-> j == i,TempsIndex)
+		if numchop(sum(TempAmp[pos])) != 0
+			push!(NewData,sum(TempAmp[pos]))
+			push!(NewsIndex,i)
+		end
+	end
+
 
 	return NewData,NewsIndex
 end
 
+export Move3_1
+function Move3_1(SetAmpAndIndex,SizeSetSpins,PosTrianglesOfMove)
+    # SetIndexAndAmp: full set of amplitude and SuperIndex pos of non zero
+	# SizeSetSpins: number of edges in polyhedra associated to SetIndexAndAmp
+	# PosTrianglesOfMove: Position of the 6 edges of the move, of the form
+    #                   [j1 j2 j3 h1 h2 h3] where ji are disappearing spins, h1 h2 h3 keeping spins
+    #                                triangles are: j1j3h1, j1j2h2, j2j3h3
+	Amp,sIndex = SetAmpAndIndex
 
+	# Create New array for final data
+	NewData = Array{Real}(undef,0)
+	NewsIndex = Array{Real}(undef,0)
 
-function ConstraintEmbedding(PrismData,trunc)
-	data = PrismEff(PrismData,trunc)
-	sIndex = data[1]
-	Amp = data[2]
-	data = nothing
+    PositionDelete = Array{Bool}(undef,0)
+    for i in 1:SizeSetSpins
+        if i in PosTrianglesOfMove[1:3]
+            push!(PositionDelete,true)
+        else
+            push!(PositionDelete,false)
+        end
+    end
 
-	for i in sIndex
-	end
-	return
+    TempAmp = Array{Real}(undef,0)
+	TempsIndex = Array{Real}(undef,0)
+    for i in 1:length(sIndex)
+        SetSpins = InverseSuperIndex(sIndex[i],SizeSetSpins)
+        TempDimFactor = (visqrt(SetSpins[PosTrianglesOfMove[1]])*visqrt(SetSpins[PosTrianglesOfMove[3]]))/visqrt(SetSpins[PosTrianglesOfMove[4]])
+        TempFsymb =Fsymb(SetSpins[PosTrianglesOfMove[6]],SetSpins[PosTrianglesOfMove[5]],SetSpins[PosTrianglesOfMove[4]],SetSpins[PosTrianglesOfMove[1]],SetSpins[PosTrianglesOfMove[3]],SetSpins[PosTrianglesOfMove[2]])
+        if numchop(TempFsymb) != 0
+            TempSetSpins = copy(SetSpins)
+            push!(TempsIndex,SuperIndex(deleteat!(TempSetSpins,PositionDelete)))
+            push!(TempAmp,(1/TempDimFactor*TempFsymb)*Amp[i])
+        end
+    end
+
+    TempAllAmp = Array{Array}(undef,0)
+    UniqueTempsIndex = unique(TempsIndex)
+    for i in UniqueTempsIndex
+        pos = findall(j-> j == i,TempsIndex)
+        push!(TempAllAmp,TempAmp[pos])
+#        if numchop(sum(TempAmp[pos])) != 0
+#            push!(NewData,(1/length(pos))*sum(TempAmp[pos]))
+#            push!(NewsIndex,i)
+#        end
+    end
+
+#    if NewData[1] != 1
+#        NewData = (1/NewData[1])*NewData
+#    end
+
+	return TempAllAmp
 end
 
 
+#### Embedding of PrismEff to space of Prism again
+export EmbPrismEff
+function EmbPrismEff(PrismData,trunc)
+    SetAmpAndIndex = PrismEff(PrismData,trunc)
+
+    #Move2_2 for big diagonal
+    Move2_2_BigDiag = Move2_2(SetAmpAndIndex,18,17,[10,11,14,15])
+
+    # Move 2_2 first triangle
+    Move2_2FirstTriangle = Move2_2(Move2_2_BigDiag,18,16,[2,10,6,13])
+
+    # Move3_1 first triangle
+    Move3_1FirstTriangle = Move3_1(Move2_2FirstTriangle,18,[10,13,14,17,16,7])
+
+    # Move 2_2 second triangle: SHOULD OR NOT ?????
+    Move2_2SecondTriangle = Move2_2(Move3_1FirstTriangle,15,15,[4,11,8,12])
+
+    # Move3_1 second triangle: SHOULD OR NOT ?????
+    Move3_1SecondTriangle = Move3_1(Move2_2SecondTriangle,15,[10,11,12,14,3,15])
+
+    EffPrism = Move3_1SecondTriangle
+
+    return EffPrism
+end
 
 
 ##### test function
